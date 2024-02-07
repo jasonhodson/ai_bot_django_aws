@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <title>Embedded AI</title>
+    <style>
+        body {
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        #chat-container {
+            font-family: 'Inter', sans-serif;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 15px;
+            padding: 10px;
+            background-color: #3856FF;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            z-index: 1000;
+            max-width: 400px;
+            border-radius: 5px;
+            resize: both;
+            overflow: auto;
+            min-width: 300px;
+            min-height: 200px;
+            max-width: 80%;
+            max-height: 80%;
+            display: flex;
+            flex-direction: column;
+        }
+        #chat-logo {
+            width: 46px;
+            height: auto;
+            position: absolute;
+            top: 1px;
+            right: 1px;
+        }
+        #chat-container h2 {
+            text-align: center;
+            font-weight: semibold;
+            font-size:13px;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+        #message-display {
+            flex-grow: 1;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            padding: 5px;
+            min-height: 200px;
+        }
+        .message-wrapper {
+            display: flex;
+            justify-content: flex-start;
+            margin: 5px 0;
+            padding: 8px 15px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            box-sizing: border-box;
+        }
+        .message {
+            display: inline-block;
+            padding: 8px 15px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            box-sizing: border-box;
+        }
+        .user-message {
+            background-color: #3856FF;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+            font-size: 13px;
+        }
+        .server-message {
+            background-color: #FB8D4E;
+            color: white;
+            text-align: left;
+            font-size: 13px;
+        }
+        #chat-form {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        #chat-form input[type="text"] {
+            flex-grow: 1;
+        }
+        #chat-form input[type="file"] {
+            display: none;
+        }
+        #attach-icon {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h2>Embedded AI Assistant</h2>
+        <div id="message-display">
+            <!-- Messages will be displayed here -->
+        </div>
+        <form id="chat-form" action="/upload/" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label for="file-input" id="attach-icon">&#128206;</label> <!-- Paper clip icon -->
+            <input type="file" name="file" id="file-input">
+            <input type="text" id="text-input" name="message" placeholder="Type a message...">
+            <input type="submit" value="Send">
+        </form>
+    </div>
+    <script>
+        window.addEventListener("beforeunload", function(event) {
+            navigator.sendBeacon('/delete_files/');
+        });
+
+        document.getElementById('file-input').addEventListener('change', function() {
+            if (this.files.length > 0) {
+                displayProcessingMessage();
+                sendFormData();
+            }
+        });
+
+        document.getElementById('chat-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            var fileInput = document.getElementById('file-input');
+            var textInput = document.getElementById('text-input').value;
+            
+            // Check if there's a file to upload
+            if (fileInput.files.length > 0) {
+                displayProcessingMessage(); // Only display this message if there's a file
+            }
+            
+            sendFormData(); // Send the form data, whether it's a file or a text message
+        });        
+
+        function displayProcessingMessage() {
+            var messageDisplay = document.getElementById('message-display');
+            var processingWrapper = document.createElement('div');
+            processingWrapper.className = 'message-wrapper server';
+    
+            var processingMessage = document.createElement('div');
+            processingMessage.className = 'message server-message';
+            processingMessage.innerHTML = "Processing your file, hold on..."; // Use innerHTML if you want to include HTML tags in the future
+    
+            processingWrapper.appendChild(processingMessage);
+            messageDisplay.appendChild(processingWrapper);
+            messageDisplay.scrollTop = messageDisplay.scrollHeight; // Auto-scroll to the latest message
+        }
+
+        function sendFormData() {
+            var form = document.getElementById('chat-form');
+            var formData = new FormData(form);
+            var textInput = document.getElementById('text-input').value;
+            var fileInput = document.getElementById('file-input').files.length > 0;
+
+            if (textInput.trim() !== '') {
+                displayUserMessage(textInput);
+            }
+        
+            // Conditionally process the request based on input type
+            if (textInput && !fileInput) {
+                // Process as a text message
+                formData.append('type', 'text'); // Indicate this is a text message
+            } else if (fileInput) {
+                // Process as a file upload
+                formData.append('type', 'file'); // Indicate this is a file upload
+            }
+        
+            fetch('/upload/', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                var messageDisplay = document.getElementById('message-display');
+                var messageWrapper = document.createElement('div');
+                messageWrapper.className = 'message server-message';
+                
+                var message = document.createElement('div');
+                message.innerHTML = data.message;
+                messageWrapper.appendChild(message);
+                
+                messageDisplay.appendChild(messageWrapper);
+                messageDisplay.scrollTop = messageDisplay.scrollHeight; // Auto-scroll to the latest message
+            })            
+            .catch(error => console.error('Error:', error));
+        
+            // Reset inputs
+            document.getElementById('text-input').value = '';
+            form.reset(); // This clears the file input
+        }
+
+    function displayUserMessage(message) {
+        var messageDisplay = document.getElementById('message-display');
+        var messageWrapper = document.createElement('div');
+        messageWrapper.className = 'message-wrapper';
+    
+        var messageDiv = document.createElement('div');
+        messageDiv.className = 'message user-message'; // Use the .user-message styling
+        messageDiv.textContent = message; // Use textContent for text to escape HTML
+    
+        messageWrapper.appendChild(messageDiv);
+        messageDisplay.appendChild(messageWrapper);
+        messageDisplay.scrollTop = messageDisplay.scrollHeight; // Auto-scroll to the latest message
+        }
+    </script>    
+</body>
+</html>

@@ -1,0 +1,1 @@
+web: gunicorn embedded_ai_chatbot.wsgi:application
